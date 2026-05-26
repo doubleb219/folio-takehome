@@ -166,5 +166,57 @@ test('document slug is logged in audit_log on creation', function () {
     assert_true($details['slug'] === $slug, 'audit log should contain the slug');
 });
 
+// --- Feature 3: Share by name (search) ---
+
+test('search by exact title returns the document', function () {
+    $slug = generate_slug('Searchable Report');
+    $stmt = db()->prepare('INSERT INTO documents (title, body, created_by, slug) VALUES (?, ?, 1, ?)');
+    $stmt->execute(['Searchable Report', 'Body', $slug]);
+
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%Searchable Report%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) >= 1, 'exact title search should return at least one result');
+    $found = false;
+    foreach ($rows as $r) {
+        if ($r['title'] === 'Searchable Report') $found = true;
+    }
+    assert_true($found, 'search results should contain the document');
+});
+
+test('search by partial title (substring) returns the document', function () {
+    $slug = generate_slug('Quarterly Budget Review');
+    $stmt = db()->prepare('INSERT INTO documents (title, body, created_by, slug) VALUES (?, ?, 1, ?)');
+    $stmt->execute(['Quarterly Budget Review', 'Body', $slug]);
+
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%Budget%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) >= 1, 'substring search should return results');
+    $found = false;
+    foreach ($rows as $r) {
+        if ($r['title'] === 'Quarterly Budget Review') $found = true;
+    }
+    assert_true($found, 'substring search should find the document');
+});
+
+test('search with no match returns empty results', function () {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%zzz_nonexistent_zzz%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) === 0, 'search for nonexistent title should return no results');
+});
+
+test('search is case-insensitive', function () {
+    $slug = generate_slug('Annual Compliance Check');
+    $stmt = db()->prepare('INSERT INTO documents (title, body, created_by, slug) VALUES (?, ?, 1, ?)');
+    $stmt->execute(['Annual Compliance Check', 'Body', $slug]);
+
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%annual compliance%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) >= 1, 'case-insensitive search should return results');
+});
+
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);
