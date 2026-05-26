@@ -10,6 +10,12 @@ if (file_exists($dbPath)) {
 $pdo = db();
 $pdo->exec(file_get_contents(__DIR__ . '/schema.sql'));
 
+$migrations = glob(__DIR__ . '/migrations/*.sql');
+sort($migrations);
+foreach ($migrations as $file) {
+    $pdo->exec(file_get_contents($file));
+}
+
 $pdo->exec("
     INSERT INTO staff (email, name) VALUES
         ('freddy@folio.example', 'Freddy Folio')
