@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: sh -c "php seed.php && php -S 0.0.0.0:8000 -t public/"
