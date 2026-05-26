@@ -120,5 +120,51 @@ test('scheduling a document logs publish_at in audit_log', function () {
     assert_true($details['publish_at'] === $future, 'audit log publish_at should match');
 });
 
+// --- Feature 2: Human-readable document IDs ---
+
+test('generate_slug returns a slug based on the title', function () {
+    $slug = generate_slug('My Test Document');
+    assert_true(str_starts_with($slug, 'my-test-document-'), 'slug should start with slugified title, got: ' . $slug);
+    assert_true(strlen($slug) > strlen('my-test-document-'), 'slug should have a random suffix');
+});
+
+test('generate_slug strips special characters', function () {
+    $slug = generate_slug('Hello, World! (2026)');
+    assert_true(str_starts_with($slug, 'hello-world-2026-'), 'slug should strip special chars, got: ' . $slug);
+});
+
+test('generate_slug produces unique slugs for the same title', function () {
+    $slug1 = generate_slug('Duplicate Title');
+    $stmt = db()->prepare('INSERT INTO documents (title, body, created_by, slug) VALUES (?, ?, 1, ?)');
+    $stmt->execute(['Duplicate Title', 'Body', $slug1]);
+
+    $slug2 = generate_slug('Duplicate Title');
+    assert_true($slug1 !== $slug2, 'two slugs for the same title should differ due to random suffix');
+});
+
+test('seeded document has a slug', function () {
+    $stmt = db()->prepare('SELECT slug FROM documents WHERE title = ?');
+    $stmt->execute(['Welcome Packet']);
+    $row = $stmt->fetch();
+    assert_true($row !== false, 'seeded document should exist');
+    assert_true(!empty($row['slug']), 'seeded document should have a slug');
+    assert_true(str_starts_with($row['slug'], 'welcome-packet-'), 'slug should be based on title, got: ' . $row['slug']);
+});
+
+test('document slug is logged in audit_log on creation', function () {
+    $slug = generate_slug('Audit Slug Test');
+    $stmt = db()->prepare('INSERT INTO documents (title, body, created_by, slug) VALUES (?, ?, 1, ?)');
+    $stmt->execute(['Audit Slug Test', 'Body', $slug]);
+    $docId = (int) db()->lastInsertId();
+
+    audit_log('create', 'document', $docId, ['title' => 'Audit Slug Test', 'slug' => $slug]);
+
+    $stmt = db()->prepare('SELECT details FROM audit_log WHERE entity_type = ? AND entity_id = ? ORDER BY id DESC LIMIT 1');
+    $stmt->execute(['document', $docId]);
+    $row = $stmt->fetch();
+    $details = json_decode($row['details'], true);
+    assert_true($details['slug'] === $slug, 'audit log should contain the slug');
+});
+
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);

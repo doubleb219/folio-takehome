@@ -21,13 +21,15 @@ $pdo->exec("
         ('freddy@folio.example', 'Freddy Folio')
 ");
 
+$slug = generate_slug('Welcome Packet');
 $stmt = $pdo->prepare('
-    INSERT INTO documents (title, body, created_by)
-    VALUES (?, ?, 1)
+    INSERT INTO documents (title, body, created_by, slug)
+    VALUES (?, ?, 1, ?)
 ');
 $stmt->execute([
     'Welcome Packet',
     "Welcome to Folio!\n\nThis is the body of your welcome packet.",
+    $slug,
 ]);
 $docId = (int) $pdo->lastInsertId();
 

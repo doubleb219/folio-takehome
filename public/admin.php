@@ -27,20 +27,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$error) {
+        $slug = generate_slug($title);
         $stmt = db()->prepare('
-            INSERT INTO documents (title, body, created_by, publish_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO documents (title, body, created_by, publish_at, slug)
+            VALUES (?, ?, ?, ?, ?)
         ');
-        $stmt->execute([$title, $body, $staff['id'], $publish_at_utc]);
+        $stmt->execute([$title, $body, $staff['id'], $publish_at_utc, $slug]);
         $docId = (int) db()->lastInsertId();
 
-        $details = ['title' => $title];
+        $details = ['title' => $title, 'slug' => $slug];
         if ($publish_at_utc) {
             $details['publish_at'] = $publish_at_utc;
         }
         audit_log('create', 'document', $docId, $details);
 
-        header('Location: /admin.php?created=' . $docId);
+        header('Location: /admin.php?created=' . urlencode($slug));
         exit;
     }
 }
@@ -59,7 +60,7 @@ render_header('Admin', $staff);
 <p class="page-subtitle">Create documents and generate share links for recipients.</p>
 
 <?php if (!empty($_GET['created'])): ?>
-    <div class="banner banner-success">Document #<?= (int) $_GET['created'] ?> created.</div>
+    <div class="banner banner-success">Document <code><?= h($_GET['created']) ?></code> created.</div>
 <?php endif ?>
 
 <?php if ($error): ?>
@@ -109,7 +110,7 @@ render_header('Admin', $staff);
                         $is_published = !$is_scheduled || $d['publish_at'] <= gmdate('Y-m-d H:i:s');
                     ?>
                     <tr>
-                        <td class="id">#<?= (int) $d['id'] ?></td>
+                        <td class="id"><?= h($d['slug'] ?? '#' . $d['id']) ?></td>
                         <td><?= h($d['title']) ?></td>
                         <td><?= h($d['creator_name']) ?></td>
                         <td><?= h($d['created_at']) ?></td>
@@ -122,7 +123,7 @@ render_header('Admin', $staff);
                                 <span class="status-badge status-scheduled">Scheduled <?= h($d['publish_at']) ?> UTC</span>
                             <?php endif ?>
                         </td>
-                        <td><a href="/share.php?doc=<?= (int) $d['id'] ?>" class="btn-link">Create share →</a></td>
+                        <td><a href="/share.php?doc=<?= h($d['slug'] ?? $d['id']) ?>" class="btn-link">Create share →</a></td>
                     </tr>
                 <?php endforeach ?>
             </tbody>
